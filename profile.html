@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>프로필</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div class="header" style="margin:0">
+                <div class="logo">🍚</div>
+                <h1 class="title">혼밥러 · 프로필</h1>
+            </div>
+            <a id="logout" class="link-btn" href="#">로그아웃</a>
+        </div>
+
+        <div class="card">
+            <p class="muted">로그인 이메일: <span id="emailTxt"></span></p>
+
+            <label>학번(입학년도)</label>
+            <input id="year" type="number" placeholder="예: 23" />
+
+            <label>나이(만)</label>
+            <input id="age" type="number" placeholder="예: 만 나이 입력" />
+
+            <label>성별</label>
+            <select id="gender">
+                <option value="">선택</option>
+                <option value="남">남</option>
+                <option value="여">여</option>
+                <option value="기타/응답안함">기타/응답안함</option>
+            </select>
+
+            <label>학과</label>
+            <input id="major" type="text" placeholder="예: 소프트웨어학부" />
+
+            <label>MBTI</label>
+            <input id="mbti" type="text" placeholder="예: INTP" />
+
+            <label>혼밥 때 주로 소비 콘텐츠</label>
+            <input id="content" type="text" placeholder="예: 유튜브, 팟캐스트, 음악" />
+
+            <button id="saveBtn" class="btn">프로필 저장</button>
+            <p id="msg" class="status"></p>
+
+            <div class="hr"></div>
+            <div class="nav">
+                <a class="link-btn" href="index.html">홈</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./firebase.js?v=15"></script>
+    <script type="module">
+        const $ = (s) => document.querySelector(s);
+        const msg = $("#msg");
+
+        // 로그인 가드 + 이메일 표시
+        (async () => {
+            try {
+                const user = await window.fb.requireAuth();
+                $("#emailTxt").textContent = user.email || "";
+                // 기존에 저장된 프로필 불러와 채우고 싶으면:
+                const data = await window.fb.loadProfile().catch(() => null);
+                if (data) {
+                    $("#year").value = data.year ?? "";
+                    $("#age").value = data.age ?? "";
+                    $("#gender").value = data.gender ?? "";
+                    $("#major").value = data.major ?? "";
+                    $("#mbti").value = data.mbti ?? "";
+                    $("#content").value = data.content ?? "";
+                }
+            } catch (e) {
+                msg.className = "status err";
+                msg.textContent = "로그인이 필요합니다.";
+                setTimeout(() => location.href = "login.html", 600);
+            }
+        })();
+
+        // 로그아웃 유지
+        $("#logout")?.addEventListener("click", async (e) => {
+            e.preventDefault();
+            await window.fb.logout().catch(() => { });
+            location.href = "login.html";
+        });
+
+        // ✅ 저장 → 매칭 페이지로 이동
+        $("#saveBtn")?.addEventListener("click", async () => {
+            try {
+                const data = {
+                    year: $("#year").value ? Number($("#year").value) : null,
+                    age: $("#age").value ? Number($("#age").value) : null,
+                    gender: $("#gender").value || null,
+                    major: $("#major").value || "",
+                    mbti: $("#mbti").value || "",
+                    content: $("#content").value || "",
+                };
+                await window.fb.saveProfile(data);
+                msg.className = "status ok";
+                msg.textContent = "프로필 저장 완료!";
+                // 잠깐 보여주고 바로 매칭 페이지로
+                setTimeout(() => location.href = "match.html", 500);
+            } catch (e) {
+                msg.className = "status err";
+                msg.textContent = "저장 실패: " + (e.message || e);
+            }
+        });
+    </script>
