@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>회원가입 · 이메일 인증</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🍚</div>
+            <h1 class="title">혼밥러 · 회원가입</h1>
+        </div>
+
+        <div class="card">
+            <p class="muted">광운대 이메일(@kw.ac.kr)만 허용</p>
+
+            <!-- 1단계: 이메일 입력/전송 -->
+            <section id="stepEmail">
+                <label>학교 이메일</label>
+                <div class="row">
+                    <input id="email" type="email" placeholder="example@kw.ac.kr" autocomplete="email" />
+                    <button id="sendLinkBtn" class="btn" style="width:auto;min-width:160px">인증 메일 보내기</button>
+                </div>
+            </section>
+
+            <!-- 2단계: 링크 소비 후 비밀번호 설정 -->
+            <section id="stepPassword" style="display:none">
+                <p id="verifiedEmail" class="muted"></p>
+
+                <label>새 비밀번호(8자 이상)</label>
+                <input id="newPassword" type="password" placeholder="********" />
+
+                <label>새 비밀번호 확인</label>
+                <input id="confirmPassword" type="password" placeholder="********" />
+
+                <button id="setPassBtn" class="btn">비밀번호 설정</button>
+            </section>
+
+            <!-- 완료 후 이동 -->
+            <a id="goLogin" class="btn secondary" href="login.html" style="display:none">로그인 하러 가기</a>
+
+            <p id="msg" class="status"></p>
+
+            <div class="hr"></div>
+            <div class="nav">
+                <a class="link-btn" href="login.html">로그인</a>
+                <a class="link-btn" href="index.html">홈</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./firebase.js?v=7"></script>
+    <script type="module">
+        const $ = (s) => document.querySelector(s);
+        const msg = $("#msg");
+        const stepEmail = $("#stepEmail");
+        const stepPassword = $("#stepPassword");
+        const verifiedEmail = $("#verifiedEmail");
+        const newPw = $("#newPassword");
+        const confirmPw = $("#confirmPassword");
+        const goLogin = $("#goLogin");
+
+        const clearInvalid = (el) => el && el.classList.remove('invalid');
+        const markInvalid = (el) => el && el.classList.add('invalid');
+        [newPw, confirmPw].forEach(el => el?.addEventListener('input', () => clearInvalid(el)));
+
+        // 링크 소비 → 비번 설정 단계로
+        (async () => {
+            try {
+                const { consumed, email } = await window.fb.handleEmailLinkIfPresent();
+                if (consumed) {
+                    stepEmail.style.display = "none";
+                    stepPassword.style.display = "block";
+                    verifiedEmail.textContent = `인증 완료: ${email}`;
+                    msg.className = "status ok";
+                    msg.textContent = "인증이 완료되었습니다. 비밀번호를 설정하세요.";
+                }
+            } catch (e) {
+                msg.className = "status err";
+                msg.textContent = "인증 처리 오류: " + e.message;
+            }
+        })();
+
+        // 인증 메일 보내기
+        $("#sendLinkBtn")?.addEventListener("click", async () => {
+            try {
+                await window.fb.sendEmailLink($("#email").value.trim());
+                msg.className = "status ok";
+                msg.textContent = "인증 링크를 전송했습니다. 메일함을 확인하세요.";
+            } catch (e) {
+                msg.className = "status err";
+                msg.textContent = "전송 실패: " + e.message;
+            }
+        });
+
+        // 비밀번호 설정 (길이/일치 검사)
+        $("#setPassBtn")?.addEventListener("click", async () => {
+            try {
+                const pw = newPw.value.trim();
+                const pw2 = confirmPw.value.trim();
+                if (pw.length < 8) { markInvalid(newPw); msg.className = "status err"; msg.textContent = "비밀번호는 8자 이상이어야 합니다."; return; }
+                if (pw !== pw2) { markInvalid(newPw); markInvalid(confirmPw); msg.className = "status err"; msg.textContent = "비밀번호가 서로 일치하지 않습니다."; return; }
+
+                await window.fb.setPasswordForCurrentUser(pw);
+                msg.className = "status ok";
+                msg.textContent = "비밀번호 설정 완료! 아래 버튼으로 로그인하세요.";
+                if (goLogin) goLogin.style.display = "block";
+            } catch (e) {
+                msg.className = "status err";
+                msg.textContent = "설정 실패: " + e.message;
+            }
+        });
+    </script>
+</body>
+</html>
