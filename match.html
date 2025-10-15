@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>혼밥러 · 매칭</title>
+    <link rel="stylesheet" href="style.css?v=15" />
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🍚</div>
+            <h1 class="title">혼밥러 · 매칭</h1>
+        </div>
+
+        <div class="card">
+            <p class="muted">“혼밥러 찾기”를 누르면 대기열에 들어가고, 동시 접속 중인 사용자와 매칭되면 채팅방으로 이동합니다.</p>
+
+            <div class="row" style="margin-top:8px">
+                <button id="startBtn" class="btn">혼밥러 찾기</button>
+                <button id="cancelBtn" class="btn" style="width:auto;min-width:120px;background:#0e1322;border:1px solid #22283a;color:#e9eef5" disabled>나가기</button>
+            </div>
+
+            <p id="status" class="status"></p>
+
+            <div class="hr"></div>
+            <div class="nav">
+                <a class="link-btn" href="profile.html">프로필</a>
+                <a class="link-btn" href="index.html">홈</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- firebase 먼저 -->
+    <script type="module" src="./firebase.js?v=15"></script>
+    <script type="module">
+        const $ = (s) => document.querySelector(s);
+        const statusEl = $("#status");
+        const startBtn = $("#startBtn");
+        const cancelBtn = $("#cancelBtn");
+
+        const setStatus = (t, cls = "") => {
+            statusEl.className = "status " + cls;
+            statusEl.textContent = t;
+        };
+
+        // fb 준비 + 로그인 가드
+        if (window.fbReady) await window.fbReady;
+        try { await window.fb.requireAuth(); }
+        catch (e) { setStatus("로그인이 필요합니다. 로그인 화면으로 이동합니다.", "err"); setTimeout(() => location.href = "login.html", 700); throw e; }
+
+        let unsubQueue = null;
+
+        // 혼밥러 찾기
+        startBtn.addEventListener("click", async () => {
+            try {
+                startBtn.disabled = true;
+                cancelBtn.disabled = false;
+                setStatus("대기열에 등록했어요. 상대를 찾는 중…");
+
+                // (선호조건 필요하면 여기 객체에 추가해서 startMatching(pref)로 전달)
+                const roomId = await window.fb.startMatching({});
+
+                // 내 대기 엔트리 구독: matched 되면 이동
+                if (unsubQueue) unsubQueue();
+                unsubQueue = window.fb.onMyQueueStatus((data) => {
+                    if (data.status === "matched" && data.roomId) {
+                        setStatus("매칭 성공! 채팅방으로 이동합니다.", "ok");
+                        setTimeout(() => location.href = `chat.html?room=${encodeURIComponent(data.roomId)}`, 400);
+                    }
+                });
+
+                // 즉시 매칭된 경우(트랜잭션에서 방 생성)
+                if (roomId) {
+                    setStatus("매칭 성공! 채팅방으로 이동합니다.", "ok");
+                    setTimeout(() => location.href = `chat.html?room=${encodeURIComponent(roomId)}`, 400);
+                }
+            } catch (e) {
+                startBtn.disabled = false;
+                cancelBtn.disabled = true;
+                setStatus("시작 실패: " + (e.message || e), "err");
+            }
+        });
+
+        // 나가기(대기 취소)
+        cancelBtn.addEventListener("click", async () => {
+            try {
+                await window.fb.cancelMatching();
+                if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+                setStatus("대기열에서 나갔어요.");
+                startBtn.disabled = false;
+                cancelBtn.disabled = true;
+            } catch (e) {
+                setStatus("취소 실패: " + (e.message || e), "err");
+            }
+        });
+
+        // 페이지 떠날 때 정리
+        window.addEventListener("beforeunload", async () => {
+            try { await window.fb.cancelMatching(); } catch (_) { }
+            try { if (unsubQueue) unsubQueue(); } catch (_) { }
+        });
+    </script>
+</body>
+</html>
