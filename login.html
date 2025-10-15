@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>혼밥러 · 로그인</title>
+    <link rel="stylesheet" href="style.css?v=13" />
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🍚</div>
+            <h1 class="title">혼밥러 · 로그인</h1>
+        </div>
+
+        <div class="card">
+            <label>이메일</label>
+            <input id="loginEmail" type="email" placeholder="example@kw.ac.kr" autocomplete="email" />
+
+            <label>비밀번호</label>
+            <input id="loginPassword" type="password" placeholder="********" />
+
+            <button id="loginBtn" class="btn">로그인</button>
+
+            <p id="msg" class="status"></p>
+
+            <div class="hr"></div>
+            <div class="nav">
+                <a class="link-btn" href="signup.html">회원가입</a>
+                <a class="link-btn" href="index.html">홈</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ★ firebase.js를 먼저 로드 -->
+    <script type="module" src="./firebase.js?v=13"></script>
+
+    <!-- ★ 페이지 스크립트: fb 준비될 때까지 잠깐 대기 -->
+    <script type="module">
+        const $ = (s) => document.querySelector(s);
+        const emailEl = $("#loginEmail");
+        const pwEl = $("#loginPassword");
+        const msg = $("#msg");
+
+        // fb 준비 대기 (레ース 방지)
+        async function waitFb() {
+            // window.fbReady가 있으면 그걸 기다리고,
+            // 없으면 window.fb가 생길 때까지 짧게 폴링
+            if (window.fbReady) {
+                await window.fbReady;
+            } else {
+                while (!(window.fb && window.fb.loginWithEmailPassword)) {
+                    await new Promise(r => setTimeout(r, 30));
+                }
+            }
+        }
+
+        await waitFb(); // ← 여기서 firebase 초기화 완료를 보장
+
+        $("#loginBtn")?.addEventListener("click", async () => {
+            try {
+                msg.className = "status";
+                msg.textContent = "";
+                const email = emailEl.value.trim();
+                const pw = pwEl.value;
+
+                await window.fb.loginWithEmailPassword(email, pw);
+                // 로그인 성공 → 프로필로
+                location.href = "profile.html";
+            } catch (e) {
+                msg.className = "status err";
+                msg.textContent = "로그인 실패: " + (e.message || e);
+            }
+        });
+    </script>
+</body>
+</html>
