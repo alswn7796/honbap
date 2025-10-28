@@ -4,74 +4,106 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>혼밥러 · 로그인</title>
-    <link rel="stylesheet" href="style.css?v=13" />
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">🍚</div>
+            <div class="logo">🍙</div>
             <h1 class="title">혼밥러 · 로그인</h1>
         </div>
 
-        <div class="card">
+        <div class="card" style="max-width:560px">
             <label>이메일</label>
-            <input id="loginEmail" type="email" placeholder="example@kw.ac.kr" autocomplete="email" />
+            <input id="email" type="email" placeholder="school@kw.ac.kr" autocomplete="username" />
 
             <label>비밀번호</label>
-            <input id="loginPassword" type="password" placeholder="********" />
+            <input id="pw" type="password" placeholder="********" autocomplete="current-password" />
 
-            <button id="loginBtn" class="btn">로그인</button>
+            <button id="loginBtn" class="btn" type="button">로그인</button>
+            <button id="resetBtn" class="btn secondary" type="button" style="margin-top:8px">비밀번호 재설정 메일 보내기</button>
 
-            <p id="msg" class="status"></p>
+            <p id="msg" class="status" style="min-height:22px"></p>
+            <p id="errraw" class="status" style="min-height:18px;color:#9aa0a6;font-size:12px"></p>
 
-            <div class="hr"></div>
-            <div class="nav">
+            <div class="row" style="gap:12px;margin-top:8px">
                 <a class="link-btn" href="signup.html">회원가입</a>
+                <a class="link-btn" href="community.html">커뮤니티</a>
                 <a class="link-btn" href="index.html">홈</a>
             </div>
         </div>
     </div>
 
-    <!-- ★ firebase.js를 먼저 로드 -->
-    <script type="module" src="./firebase.js?v=13"></script>
-
-    <!-- ★ 페이지 스크립트: fb 준비될 때까지 잠깐 대기 -->
+    <script type="module" src="firebase.js?v=login-dbg"></script>
     <script type="module">
         const $ = (s) => document.querySelector(s);
-        const emailEl = $("#loginEmail");
-        const pwEl = $("#loginPassword");
+        const emailEl = $("#email");
+        const pwEl = $("#pw");
+        const btn = $("#loginBtn");
+        const reset = $("#resetBtn");
         const msg = $("#msg");
+        const raw = $("#errraw");
 
-        // fb 준비 대기 (레ース 방지)
-        async function waitFb() {
-            // window.fbReady가 있으면 그걸 기다리고,
-            // 없으면 window.fb가 생길 때까지 짧게 폴링
-            if (window.fbReady) {
-                await window.fbReady;
-            } else {
-                while (!(window.fb && window.fb.loginWithEmailPassword)) {
-                    await new Promise(r => setTimeout(r, 30));
-                }
-            }
+        function setMsg(kind, text, rawText = "") {
+            msg.className = "status " + (kind || "");
+            msg.textContent = text || "";
+            raw.textContent = rawText || "";
         }
 
-        await waitFb(); // ← 여기서 firebase 초기화 완료를 보장
+        [emailEl, pwEl].forEach(el => {
+            el.addEventListener("keydown", (e) => { if (e.key === "Enter") btn.click(); });
+        });
 
-        $("#loginBtn")?.addEventListener("click", async () => {
+        btn.addEventListener("click", async () => {
             try {
-                msg.className = "status";
-                msg.textContent = "";
+                setMsg("", "");
+                btn.disabled = true; reset.disabled = true;
+                await window.fbReady;
+
                 const email = emailEl.value.trim();
                 const pw = pwEl.value;
+                if (!email || !pw) { setMsg("err", "이메일과 비밀번호를 입력하세요."); return; }
 
                 await window.fb.loginWithEmailPassword(email, pw);
-                // 로그인 성공 → 프로필로
-                location.href = "profile.html";
+                setMsg("ok", "로그인 성공! 이동합니다…");
+                location.href = "index.html";
             } catch (e) {
-                msg.className = "status err";
-                msg.textContent = "로그인 실패: " + (e.message || e);
+                const code = e?.code || "";
+                const message = e?.message || String(e);
+                let pretty = "로그인 실패";
+                if (code.includes("invalid-credential")) pretty = "계정에 비밀번호가 없거나(이메일 링크 가입), 비밀번호가 올바르지 않습니다.";
+                else if (code.includes("wrong-password")) pretty = "비밀번호가 올바르지 않습니다.";
+                else if (code.includes("user-not-found")) pretty = "가입된 계정을 찾을 수 없습니다.";
+                else if (code.includes("too-many-requests")) pretty = "시도 횟수가 많습니다. 잠시 후 다시 시도하세요.";
+                else if (code.includes("network-request-failed")) pretty = "네트워크 오류입니다. 연결을 확인하세요.";
+                setMsg("err", pretty, `[${code}] ${message}`);
+            } finally {
+                btn.disabled = false; reset.disabled = false;
             }
         });
+
+        reset.addEventListener("click", async () => {
+            try {
+                setMsg("", "");
+                reset.disabled = true; btn.disabled = true;
+                await window.fbReady;
+                const email = emailEl.value.trim();
+                await window.fb.resetPasswordByEmail(email);
+                setMsg("ok", "재설정 메일을 보냈습니다. 메일함을 확인하세요.");
+            } catch (e) {
+                setMsg("err", "재설정 메일 발송 실패", `[${e?.code}] ${e?.message || e}`);
+            } finally {
+                reset.disabled = false; btn.disabled = false;
+            }
+        });
+
+        // 이미 로그인되어 있으면 홈으로
+        (async () => {
+            try {
+                await window.fbReady;
+                window.fb.requireAuth().then(() => location.replace("index.html")).catch(() => { });
+            } catch (_) { }
+        })();
     </script>
 </body>
 </html>
