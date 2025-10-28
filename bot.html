@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>혼밥러 · 테스트 봇</title>
+    <link rel="stylesheet" href="style.css?v=36" />
+</head>
+<body>
+    <div class="container">
+        <div class="header"><div class="logo">🤖</div><h1 class="title">혼밥러 · 테스트 봇</h1></div>
+        <div class="card">
+            <p class="muted">이 프레임은 봇 전용 앱으로 익명 로그인하여 대기열에 들어갑니다.</p>
+            <p id="log" class="status"></p>
+            <div class="nav">
+                <a class="link-btn" href="#" onclick="location.reload();return false;">새로고침</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAuth, setPersistence, browserSessionPersistence, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
+        import {
+            getFirestore, doc, setDoc, updateDoc, deleteDoc, serverTimestamp,
+            collection, query, where, limit, getDocs
+        } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+
+        const logEl = document.getElementById("log");
+        const log = (t, ok = false) => { logEl.className = "status " + (ok ? "ok" : ""); logEl.textContent = t; };
+
+        // 동일 프로젝트지만 "bot"이라는 별도 앱 이름으로 독립 인스턴스 생성 -> 메인 인증과 분리됨
+        const firebaseConfig = {
+            apiKey: "AIzaSyB0TUXQpzZIy0v2gbLOC343Jx_Lv51EQvw",
+            authDomain: "honbap-paring.firebaseapp.com",
+            projectId: "honbap-paring",
+            storageBucket: "honbap-paring.firebasestorage.app",
+            messagingSenderId: "375771626039",
+            appId: "1:375771626039:web:03868631de56225cf49db2",
+        };
+        const botApp = initializeApp(firebaseConfig, "bot");
+        const auth = getAuth(botApp);
+        const db = getFirestore(botApp);
+
+        const HEARTBEAT_MS = 10_000;
+        let hb = null;
+
+        async function enqueue() {
+            const u = auth.currentUser;
+            const ref = doc(db, "matchQueue", u.uid);
+            const now = serverTimestamp();
+            await setDoc(ref, {
+                uid: u.uid, email: null,
+                pref: { bot: true }, status: "waiting",
+                lastActive: now, createdAt: now, roomId: null,
+            }, { merge: true });
+
+            if (hb) clearInterval(hb);
+            hb = setInterval(async () => { try { await updateDoc(ref, { lastActive: serverTimestamp() }); } catch (_) { } }, HEARTBEAT_MS);
+            log("봇 준비 완료. 대기열에 등록함…", true);
+        }
+
+        async function cleanup() {
+            try {
+                const u = auth.currentUser;
+                if (!u) return;
+                if (hb) { clearInterval(hb); hb = null; }
+                await deleteDoc(doc(db, "matchQueue", u.uid)).catch(() => { });
+            } catch (_) { }
+        }
+
+        // 자동 시작
+        await setPersistence(auth, browserSessionPersistence);
+        await new Promise((resolve, reject) => {
+            onAuthStateChanged(auth, async (user) => {
+                try {
+                    if (!user) { await signInAnonymously(auth); return; }
+                    // 로그인되면 바로 대기열 진입
+                    await enqueue();
+                    resolve();
+                } catch (e) { reject(e); }
+            }, reject);
+        });
+
+        window.addEventListener("beforeunload", cleanup);
+    </script>
+</body>
+</html>
