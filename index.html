@@ -3,35 +3,95 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>혼밥러</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>혼밥러 · 홈</title>
+    <link rel="stylesheet" href="style.css?v=31" />
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div class="logo">🍚</div>
-            <h1 class="title">혼밥러</h1>
+            <h1 class="title">혼밥러 · 홈</h1>
         </div>
+
         <div class="card">
-            <p class="muted">잠깐만요… 화면을 준비 중입니다.</p>
-            <div class="nav">
-                <a class="link-btn" href="signup.html">회원가입</a>
-                <a class="link-btn" href="login.html">로그인</a>
+            <div class="row" style="gap:16px">
+                <a class="link-btn" href="match.html" style="flex:1;text-align:center">
+                    <div>혼밥러 매칭</div><div class="muted">바로 시작</div>
+                </a>
+                <a class="link-btn" href="community.html" style="flex:1;text-align:center">
+                    <div>커뮤니티</div><div class="muted">글/댓글/좋아요</div>
+                </a>
+                <a class="link-btn" href="profile.html" style="flex:1;text-align:center">
+                    <div>내 프로필</div><div class="muted">정보 수정</div>
+                </a>
             </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin:0 0 10px">무슨 생각 중이에요?</h3>
+            <label>제목</label>
+            <input id="homeTitle" type="text" placeholder="예: 오늘 저녁 추천" />
+            <label>내용</label>
+            <div class="row">
+                <input id="homeText" type="text" placeholder="짧아도 좋아요! 간단 메모" />
+                <button id="homePostBtn" class="btn" style="width:auto;min-width:90px">등록</button>
+            </div>
+            <p id="homeMsg" class="status"></p>
+            <p class="muted">전체 글쓰기는 커뮤니티에서 볼 수 있어요.</p>
+        </div>
+
+        <div class="card">
+            <div class="topbar" style="margin:0 0 6px">
+                <h3 class="title" style="font-size:18px;margin:0">최신 글</h3>
+                <a class="link-btn" href="community.html">더 보기</a>
+            </div>
+            <div id="recentPosts"></div>
         </div>
     </div>
 
-    <script type="module" src="./firebase.js"></script>
+    <script type="module" src="./firebase.js?v=31"></script>
     <script type="module">
-    // 로그인 여부 보고 바로 이동
-    // (빠른 UX를 위해 onAuthStateChanged가 아니라 currentUser 폴백 + 짧은 대기)
-    async function waitAuthReady(ms=300){ await new Promise(r=>setTimeout(r,ms)); }
-    (async ()=>{
-      await waitAuthReady();
-      const user = window.fb.auth.currentUser;
-      if (user) location.replace("profile.html");
-      else location.replace("signup.html");
-    })();
+        const $ = (s) => document.querySelector(s);
+        const msg = $("#homeMsg");
+        const setMsg = (t, ok = false) => { msg.className = "status " + (ok ? "ok" : "err"); msg.textContent = t; };
+
+        if (window.fbReady) await window.fbReady;
+
+        // 최신 글 5개 표시
+        async function loadRecent() {
+            try {
+                const arr = await window.fb.listPosts({ limitCount: 5 });
+                const box = $("#recentPosts");
+                box.innerHTML = arr.map(p => {
+                    const when = p.createdAt?.toDate?.() ? p.createdAt.toDate().toLocaleString() : "";
+                    const title = (p.title || "").replace(/</g, "&lt;");
+                    const body = (p.body || "").replace(/</g, "&lt;");
+                    return `<div style="padding:10px;border:1px solid #22283a;border-radius:10px;margin:8px 0;background:#0e1322">
+                        <div style="font-weight:700">${title}</div>
+                        <div class="muted" style="font-size:12px">${when}</div>
+                        <div style="margin-top:6px">${body}</div>
+                      </div>`;
+                }).join("") || `<p class="muted">아직 글이 없어요.</p>`;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        loadRecent();
+
+        // 홈에서 간단 글 등록
+        $("#homePostBtn").addEventListener("click", async () => {
+            try {
+                msg.className = "status"; msg.textContent = "";
+                const title = String($("#homeTitle").value ?? "");  // ⬅ 문자열 보장
+                const text = String($("#homeText").value ?? "");
+                await window.fb.createPost(title, text);
+                setMsg("등록 완료!", true);
+                $("#homeTitle").value = ""; $("#homeText").value = "";
+                loadRecent();
+            } catch (e) {
+                setMsg((e && e.message) ? e.message : String(e));
+            }
+        });
     </script>
 </body>
 </html>
