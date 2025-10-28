@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>혼밥러 · 커뮤니티</title>
+    <link rel="stylesheet" href="style.css?v=31" />
+</head>
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div class="header" style="margin:0">
+                <div class="logo">🍚</div>
+                <h1 class="title">혼밥러 · 커뮤니티</h1>
+            </div>
+            <div>
+                <a class="link-btn" href="match.html">매칭</a>
+                <a class="link-btn" href="profile.html">프로필</a>
+                <a class="link-btn" href="index.html">홈</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin:0 0 10px">게시글 쓰기</h3>
+            <label>제목</label>
+            <input id="title" type="text" placeholder="예: 오늘 점심 혼밥 후기" />
+            <label>내용</label>
+            <textarea id="body" rows="4" placeholder="자유롭게 작성하세요."></textarea>
+            <button id="postBtn" class="btn" style="width:auto;min-width:90px">등록</button>
+            <p id="msg" class="status"></p>
+        </div>
+
+        <div class="card">
+            <div class="topbar" style="margin:0 0 6px">
+                <h3 class="title" style="font-size:18px;margin:0">최신 글</h3>
+            </div>
+            <div id="list"></div>
+        </div>
+    </div>
+
+    <script type="module" src="./firebase.js?v=31"></script>
+    <script type="module">
+        const $ = (s) => document.querySelector(s);
+        const msg = $("#msg");
+        const setMsg = (t, ok = false) => { msg.className = "status " + (ok ? "ok" : "err"); msg.textContent = t; };
+
+        if (window.fbReady) await window.fbReady;
+
+        // 글 등록
+        $("#postBtn").addEventListener("click", async () => {
+            try {
+                msg.className = "status"; msg.textContent = "";
+                // ⬇ 반드시 .value로 문자열을 넘긴다
+                const title = String($("#title").value ?? "");
+                const body = String($("#body").value ?? "");
+                await window.fb.createPost(title, body);
+                setMsg("등록 완료!", true);
+                $("#title").value = ""; $("#body").value = "";
+                await render();
+            } catch (e) {
+                setMsg((e && e.message) ? e.message : String(e));
+            }
+        });
+
+        // 목록
+        async function render() {
+            try {
+                const arr = await window.fb.listPosts({ limitCount: 50 });
+                const box = $("#list");
+                box.innerHTML = arr.map(p => {
+                    const when = p.createdAt?.toDate?.() ? p.createdAt.toDate().toLocaleString() : "";
+                    const title = (p.title || "").replace(/</g, "&lt;");
+                    const body = (p.body || "").replace(/</g, "&lt;");
+                    // 관리자면 규칙 통과로 삭제 가능(버튼은 모두 보이되, 권한 없으면 permission 에러)
+                    return `<div style="padding:10px;border:1px solid #22283a;border-radius:10px;margin:8px 0;background:#0e1322">
+                        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+                          <div style="font-weight:700">${title}</div>
+                          <button class="link-btn" data-del="${p.id}" style="background:#2a3145">삭제</button>
+                        </div>
+                        <div class="muted" style="font-size:12px">${when}</div>
+                        <div style="margin-top:6px">${body}</div>
+                      </div>`;
+                }).join("") || `<p class="muted">아직 글이 없어요.</p>`;
+
+                // 삭제 핸들러 위임
+                box.querySelectorAll("[data-del]").forEach(btn => {
+                    btn.addEventListener("click", async () => {
+                        try {
+                            await window.fb.deletePost(btn.dataset.del);
+                            await render();
+                        } catch (e) {
+                            alert((e && e.message) ? e.message : String(e));
+                        }
+                    });
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        render();
+    </script>
+</body>
+</html>
