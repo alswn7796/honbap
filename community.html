@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>혼밥러 · 커뮤니티</title>
-    <link rel="stylesheet" href="style.css?v=17" />
+    <link rel="stylesheet" href="style.css?v=20" />
     <style>
         .post-card {
             background: #0e1322;
@@ -39,14 +39,6 @@
 
         .muted-sm {
             color: #9aa0a6;
-            font-size: 12px
-        }
-
-        .chip {
-            display: inline-block;
-            padding: 4px 8px;
-            border: 1px solid #2a3145;
-            border-radius: 999px;
             font-size: 12px
         }
     </style>
@@ -87,15 +79,11 @@
         </div>
     </div>
 
-    <script type="module" src="./firebase.js?v=22"></script>
-
+    <script type="module" src="./firebase.js?v=27"></script>
     <script type="module">
         const $ = (s) => document.querySelector(s);
-        const list = $("#list");
-        const moreBtn = $("#moreBtn");
-        const countTxt = $("#countTxt");
-        const postBtn = $("#postBtn");
-        const postMsg = $("#postMsg");
+        const list = $("#list"), moreBtn = $("#moreBtn"), countTxt = $("#countTxt");
+        const postBtn = $("#postBtn"), postMsg = $("#postMsg");
         let cursor = null;
 
         if (window.fbReady) await window.fbReady;
@@ -116,9 +104,7 @@
                 list.innerHTML = ""; cursor = null; await loadMore();
             } catch (e) {
                 postMsg.className = "status err"; postMsg.textContent = e.message || e;
-            } finally {
-                postBtn.disabled = false;
-            }
+            } finally { postBtn.disabled = false; }
         });
 
         async function loadMore() {
@@ -130,74 +116,16 @@
         }
         moreBtn.addEventListener("click", loadMore);
 
-        function esc(s) { return (s || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
-
+        const esc = (s) => (s || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m]));
         function renderPostCard(p) {
             const wrap = document.createElement("div");
             wrap.className = "post-card";
             wrap.innerHTML = `
-                    <h3 class="post-title">${esc(p.title)}</h3>
-                    <div class="post-meta">${p.authorEmail ? esc(p.authorEmail.split("@")[0]) : "익명"} · ${p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString() : ""}</div>
-                    <div class="post-body">${esc(p.body)}</div>
-                    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
-                      <button class="btn" data-action="like" style="width:auto;min-width:80px">좋아요 ♡ <span class="likecnt">0</span></button>
-                      ${p.authorUid === window.fb.auth.currentUser?.uid ? `
-                        <button class="btn secondary" data-action="edit"  style="width:auto">수정</button>
-                        <button class="btn secondary" data-action="del"   style="width:auto">삭제</button>
-                      ` : ""}
-                    </div>
-                    <div class="comments" style="margin-top:10px; padding-top:10px; border-top:1px solid #22283a">
-                      <div class="row">
-                        <input class="cinput" type="text" placeholder="댓글 입력..." />
-                        <button class="cbtn btn" style="width:auto;min-width:80px">전송</button>
-                      </div>
-                      <div class="clist"></div>
-                      <p class="cmsg status"></p>
-                    </div>
-                  `;
+            <h3 class="post-title">${esc(p.title)}</h3>
+            <div class="post-meta">${p.authorEmail ? esc(p.authorEmail.split("@")[0]) : "익명"} · ${p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString() : ""}</div>
+            <div class="post-body">${esc(p.body)}</div>
+          `;
             list.prepend(wrap);
-
-            const likeBtn = wrap.querySelector('[data-action="like"]');
-            const likeCntEl = wrap.querySelector('.likecnt');
-            const cInput = wrap.querySelector('.cinput');
-            const cBtn = wrap.querySelector('.cbtn');
-            const cList = wrap.querySelector('.clist');
-            const cMsg = wrap.querySelector('.cmsg');
-
-            const unLikes = window.fb.onLikeCount(p.id, (n) => { likeCntEl.textContent = String(n); });
-            likeBtn?.addEventListener("click", async () => {
-                likeBtn.disabled = true;
-                try { await window.fb.toggleLike(p.id); } finally { likeBtn.disabled = false; }
-            });
-
-            const unComments = window.fb.onComments(p.id, (arr) => {
-                cList.innerHTML = "";
-                arr.forEach(cm => {
-                    const item = document.createElement("div");
-                    item.className = "comment";
-                    item.innerHTML = `
-                        <div>${esc(cm.text)}</div>
-                        <div class="post-meta">${cm.authorEmail ? esc(cm.authorEmail.split("@")[0]) : "익명"} · ${cm.createdAt?.toDate ? cm.createdAt.toDate().toLocaleString() : ""}</div>
-                        ${cm.authorUid === window.fb.auth.currentUser?.uid ? `<a href="#" data-del="${cm.id}" class="muted-sm">삭제</a>` : ""}
-                      `;
-                    cList.appendChild(item);
-                });
-            });
-
-            cBtn.addEventListener("click", async () => {
-                try {
-                    cMsg.className = "status"; cMsg.textContent = "";
-                    const t = cInput.value.trim(); if (!t) return;
-                    cInput.value = ""; await window.fb.addComment(p.id, t);
-                } catch (e) { cMsg.className = "status err"; cMsg.textContent = e.message || e; }
-            });
-            cList.addEventListener("click", async (e) => {
-                const a = e.target.closest("a[data-del]"); if (!a) return;
-                e.preventDefault();
-                try { await window.fb.deleteComment(p.id, a.getAttribute("data-del")); } catch (_) { }
-            });
-
-            window.addEventListener("beforeunload", () => { try { unLikes(); } catch (_) { } try { unComments(); } catch (_) { } });
         }
 
         await loadMore();
