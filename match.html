@@ -4,243 +4,249 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>혼밥러 · 매칭</title>
-    <link rel="stylesheet" href="style.css?v=40" />
+    <link rel="stylesheet" href="style.css" />
+    <!-- firebase 로더 (그대로) -->
+    <script type="module" src="./firebase.js?v=24"></script>
     <style>
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2,1fr);
-            gap: 10px;
+        .loading {
+            position: relative;
+            pointer-events: none;
+            opacity: .85;
         }
 
-        .pill {
-            display: inline-block;
-            padding: 6px 10px;
-            border: 1px solid #2a3145;
-            border-radius: 999px;
-            font-size: 12px;
-        }
+            .loading::after {
+                content: " …";
+                animation: dots 1.2s steps(3,end) infinite;
+            }
 
-        .section {
-            margin-top: 14px;
-            padding: 12px;
-            border: 1px solid #22283a;
-            border-radius: 12px;
-            background: #0e1322;
+        @keyframes dots {
+            0% {
+                content: " ."
+            }
+
+            33% {
+                content: " .."
+            }
+
+            66% {
+                content: " ..."
+            }
+
+            100% {
+                content: " ."
+            }
+        }
+        /* 필터 비활성화 시 살짝 흐리게 */
+        #filters[aria-disabled="true"] {
+            opacity: .55;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header"><div class="logo">🍚</div><h1 class="title">혼밥러 · 매칭</h1></div>
+        <header class="page-header">
+            <h1 class="title">🍱 혼밥러 · 매칭</h1>
+            <p class="muted" style="margin-top:4px">
+                “혼밥러 찾기”를 누르면 대기열에 들어가고, 매칭되면 “수락/거절 → 채팅 시작(Y/n)” 절차를 진행합니다.
+            </p>
+        </header>
 
-        <div class="card">
-            <div class="section">
-                <h3 style="margin:0 0 8px 0;font-size:16px">필터 선택(옵션)</h3>
-                <div class="grid">
-                    <div>
-                        <label>학번(입학년도)</label>
-                        <input id="fYear" type="number" placeholder="예: 23" />
-                    </div>
-                    <div>
-                        <label>학과</label>
-                        <input id="fMajor" type="text" placeholder="예: 소프트웨어학부" />
-                    </div>
-                    <div>
-                        <label>성별</label>
-                        <select id="fGender">
-                            <option value="">상관없음</option>
-                            <option value="남">남</option>
-                            <option value="여">여</option>
-                            <option value="기타/응답안함">기타/응답안함</option>
-                        </select>
-                    </div>
-                    <div class="grid" style="grid-template-columns:repeat(2,1fr); gap:8px">
-                        <div>
-                            <label>나이 최소</label>
-                            <input id="fAgeMin" type="number" placeholder="예: 20" />
-                        </div>
-                        <div>
-                            <label>나이 최대</label>
-                            <input id="fAgeMax" type="number" placeholder="예: 30" />
-                        </div>
-                    </div>
-                </div>
-                <p class="muted" style="margin-top:8px">
-                    * 공강시간은 프로필에서 입력한 값이 사용됩니다. 서로 공강이 겹쳐야 후보로 간주됩니다.
-                </p>
-                <div class="row" style="margin-top:8px">
-                    <button id="startBtn" class="btn">혼밥러 찾기(요청)</button>
-                    <button id="startBotBtn" class="btn" style="width:auto;min-width:220px">혼밥러 찾기(봇 테스트 · 같은 탭)</button>
-                    <button id="cancelBtn" class="btn" style="width:auto;min-width:120px;background:#0e1322;border:1px solid #22283a;color:#e9eef5" disabled>나가기</button>
-                </div>
+        <div class="card" style="max-width:560px">
+            <!-- ✅ 필터 묶음에 id="filters" 부여 (상태 표시용) -->
+            <div id="filters" class="row" style="gap:16px; flex-wrap:wrap; margin-bottom:12px">
+                <label class="chip"><input id="yearSame" type="checkbox" /> 학번 같게</label>
+                <label class="chip"><input id="majorSame" type="checkbox" /> 학과 같게</label>
+                <label class="chip"><input id="ageSame" type="checkbox" /> 나이 같게</label>
+                <label class="chip"><input id="genderSame" type="checkbox" /> 성별 같게</label>
+                <label class="chip"><input id="freeOverlap" type="checkbox" /> 공강 겹침 우선</label>
+                <label class="chip"><input id="onlineOnly" type="checkbox" /> 동시접속만</label>
             </div>
 
-            <div class="section">
-                <h3 style="margin:0 0 8px 0;font-size:16px">진행 상태</h3>
-                <p id="status" class="status"></p>
-                <!-- 상대에게서 온 '제안' / 내가 건 '제안' / 채팅 시작(Y/N) -->
-                <div id="incoming" style="display:none">
-                    <div class="pill">상대가 매칭을 제안했습니다.</div>
-                    <p id="incomingInfo" class="muted"></p>
-                    <div class="row"><button id="acceptBtn" class="btn">수락</button><button id="declineBtn" class="btn" style="background:#0e1322;border:1px solid #22283a;color:#e9eef5">거절</button></div>
-                </div>
-
-                <div id="readyYN" style="display:none; margin-top:8px">
-                    <div class="pill">매칭 수락 완료. 채팅을 시작하시겠습니까?</div>
-                    <div class="row"><button id="readyYes" class="btn">Y</button><button id="readyNo" class="btn" style="background:#0e1322;border:1px solid #22283a;color:#e9eef5">N</button></div>
-                </div>
+            <!-- 버튼: 커뮤니티 버튼과 동일 크기/스타일 유지 -->
+            <div class="row" style="gap:12px; margin-bottom:8px">
+                <button id="startBtn" class="btn outline">혼밥러 찾기</button>
+                <button id="leaveBtn" class="btn outline">나가기</button>
+                <button id="reopenBtn" class="btn outline" style="display:none">채팅방 열기</button>
             </div>
 
-            <div class="hr"></div>
-            <div class="nav">
-                <a class="link-btn" href="community.html">커뮤니티</a>
-                <a class="link-btn" href="profile.html">프로필</a>
-                <a class="link-btn" href="index.html">홈</a>
+            <p id="status" class="muted" style="min-height:20px"></p>
+
+            <div class="row" style="gap:8px; margin-top:8px">
+                <a class="btn outline" href="community.html">커뮤니티</a>
+                <a class="btn outline" href="profile.html">프로필</a>
+                <a class="btn outline" href="index.html">홈</a>
+                <a class="btn outline" href="bot.html">봇</a>
             </div>
         </div>
     </div>
 
-    <!-- 봇 프레임(같은 탭 테스트용) -->
-    <iframe id="botFrame" src="about:blank" style="width:0;height:0;border:0;position:absolute;left:-9999px;top:-9999px"></iframe>
-
-    <script type="module" src="./firebase.js?v=40"></script>
     <script type="module">
-        const $ = (s) => document.querySelector(s);
-        const statusEl = $("#status");
-        const startBtn = $("#startBtn"), startBotBtn = $("#startBotBtn"), cancelBtn = $("#cancelBtn");
-        const incoming = $("#incoming"), incomingInfo = $("#incomingInfo");
-        const acceptBtn = $("#acceptBtn"), declineBtn = $("#declineBtn");
-        const readyYN = $("#readyYN"), yesBtn = $("#readyYes"), noBtn = $("#readyNo");
-        const botFrame = $("#botFrame");
+        const $ = (id) => document.getElementById(id);
+        const say = (msg, ok = true) => {
+            const el = $('status'); el.textContent = msg || '';
+            el.style.color = ok ? 'var(--text-muted,#9fb7d0)' : '#ff6b6b';
+        };
 
-        const setStatus = (t, cls = "") => { statusEl.className = "status " + cls; statusEl.textContent = t; };
+        async function ensureFbReady(timeoutMs = 8000) {
+            if (window.fb) return window.fb;
+            const readyP = (window.fbReady && typeof window.fbReady.then === 'function')
+                ? window.fbReady
+                : new Promise((resolve, reject) => {
+                    const st = Date.now();
+                    const iv = setInterval(() => {
+                        if (window.fb) { clearInterval(iv); resolve(window.fb); }
+                        if (Date.now() - st > timeoutMs) { clearInterval(iv); reject(new Error('firebase 로더가 준비되지 않았어요.')); }
+                    }, 100);
+                });
+            const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('firebase 로더가 준비되지 않았어요.')), timeoutMs));
+            return await Promise.race([readyP, timeoutP]);
+        }
 
-        if (window.fbReady) await window.fbReady;
-        try { await window.fb.requireAuth(); } catch (e) { setStatus("로그인이 필요합니다. 로그인 화면으로 이동합니다.", "err"); setTimeout(() => location.href = "login.html", 700); throw e; }
+        // 최근 방 다시 열기
+        const lastRoomId = localStorage.getItem('lastRoomId');
+        if (lastRoomId) {
+            const b = $('reopenBtn');
+            b.style.display = 'inline-block';
+            b.addEventListener('click', () => {
+                location.href = `chat.html?room=${encodeURIComponent(lastRoomId)}`;
+            });
+        }
 
-        let currentPairId = null;
-        let unsubPairs = null, unsubIncoming = null;
+        // ---- 취소/상태 플래그 ----
+        let finding = false;         // 매칭 플로우 진행 중
+        let cancelRequested = false; // 사용자가 나가기 클릭
 
-        // 내 pairings 상태 감시 → 단계별 UI 갱신
-        function subscribePairings() {
-            if (unsubPairs) unsubPairs();
-            unsubPairs = window.fb.watchMyPairings(async (list) => {
-                // 가장 최근 항목 하나 기준
-                list.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
-                const p = list[0];
-                if (!p) { currentPairId = null; readyYN.style.display = "none"; return; }
-                currentPairId = p.pairId || p.id;
+        const filterIds = ['yearSame', 'majorSame', 'ageSame', 'genderSame', 'freeOverlap', 'onlineOnly'];
+        const setFiltersDisabled = (disabled) => {
+            const box = $('filters');
+            box?.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+            filterIds.forEach(id => {
+                const el = $(id);
+                if (el) el.disabled = disabled;
+            });
+        };
 
-                if (p.status === "accepted") {
-                    readyYN.style.display = "block";
-                    setStatus("매칭 수락됨. 채팅 시작(Y/N)을 선택하세요.", "ok");
-                } else if (p.status === "chatting" && p.roomId) {
-                    setStatus("채팅방으로 이동합니다…", "ok");
-                    location.href = `chat.html?room=${encodeURIComponent(p.roomId)}`;
-                } else if (p.status === "proposed") {
-                    // 내가 낸 제안일 수 있음
-                    readyYN.style.display = "none";
-                    setStatus("상대 응답 대기 중…");
-                } else if (p.status === "cancelled") {
-                    readyYN.style.display = "none";
-                    setStatus("매칭이 취소되었습니다.", "err");
+        const setFindingUI = (on) => {
+            const startBtn = $('startBtn');
+            startBtn.classList.toggle('loading', on);
+            startBtn.textContent = on ? '매칭 중' : '혼밥러 찾기';
+            startBtn.disabled = on;
+            setFiltersDisabled(on); // ✅ 매칭 중엔 필터 비활성화
+        };
+
+        const checkCancelled = () => {
+            if (cancelRequested) {
+                say('대기열에서 나갔어요.');
+                return true;
+            }
+            return false;
+        };
+
+        $('startBtn').addEventListener('click', onStart);
+        $('leaveBtn').addEventListener('click', onLeave);
+
+        window.addEventListener('beforeunload', async () => {
+            try { const fb = await ensureFbReady(500); await fb.cancelMatching(); } catch { }
+        });
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'hidden') {
+                try { const fb = await ensureFbReady(500); await fb.markLeaving(); } catch { }
+            }
+        });
+
+        // --------- 매칭 플로우 ----------
+        async function onStart() {
+            if (finding) return;         // 중복 시작 방지
+            finding = true;
+            cancelRequested = false;
+            setFindingUI(true);
+            say('대기열에 등록했습니다. 매칭 중…');
+
+            try {
+                const fb = await ensureFbReady();
+                if (checkCancelled()) return cleanup();
+
+                const opts = {
+                    yearSame: $('yearSame').checked,
+                    majorSame: $('majorSame').checked,
+                    ageSame: $('ageSame').checked,
+                    genderSame: $('genderSame').checked,
+                    freeOverlap: $('freeOverlap').checked,
+                    onlineOnly: $('onlineOnly').checked,
+                };
+
+                const { id: roomId } = await fb.startMatching(opts);
+                if (checkCancelled()) return cleanup(true, fb);
+                say('매칭 중… (상대 수락 대기)');
+
+                const accepted = await fb.readyToAccept(roomId, 30);
+                if (checkCancelled()) return cleanup(true, fb);
+                if (!accepted) {
+                    say('상대가 수락하지 않았어요. (패널티 -1점)', false);
+                    await fb.applyPenalty({ kind: 'early_decline' });
+                    return;
                 }
-            });
-        }
 
-        // 상대에게서 온 proposal 감시
-        function subscribeIncoming() {
-            if (unsubIncoming) unsubIncoming();
-            unsubIncoming = window.fb.onIncomingProposals((list) => {
-                if (list.length === 0) { incoming.style.display = "none"; return; }
-                const p = list[0]; // 가장 최근 하나만
-                currentPairId = p.pairId || p.id;
-                incoming.style.display = "block";
-                incomingInfo.textContent = `공강 겹침: ${p.overlapSlot || "미상"}, 필터: ${Object.keys(p.filters || {}).map(k => `${k}=${p.filters[k]}`).join(", ") || "없음"}`;
-                setStatus("혼밥러 매칭 제안 도착: 수락하시겠습니까?");
-            });
-        }
+                say('매칭 성공! "채팅 시작(Y/n)" 단계로 넘어갑니다.');
+                const yes = window.confirm('채팅을 시작 하시겠습니까?');
+                if (checkCancelled()) return cleanup(true, fb);
 
-        subscribePairings();
-        subscribeIncoming();
+                if (yes) {
+                    await fb.startYes(roomId);
+                } else {
+                    await fb.startNo(roomId);
+                    say('채팅 시작을 거절했어요. (패널티 -1점)', false);
+                    await fb.applyPenalty({ kind: 'start_decline' });
+                    return;
+                }
 
-        // 버튼들
-        function getFilters() {
-            return {
-                year: $("#fYear").value ? Number($("#fYear").value) : null,
-                major: $("#fMajor").value.trim() || null,
-                gender: $("#fGender").value || null,
-                ageMin: $("#fAgeMin").value ? Number($("#fAgeMin").value) : null,
-                ageMax: $("#fAgeMax").value ? Number($("#fAgeMax").value) : null,
-            };
-        }
+                say('매칭 중… (상대 시작 여부 확인)');
+                const go = await fb.readyToChat(roomId, 30);
+                if (checkCancelled()) return cleanup(true, fb);
 
-        startBtn.addEventListener("click", async () => {
-            try {
-                startBtn.disabled = startBotBtn.disabled = true; cancelBtn.disabled = false;
-                setStatus("대기열 등록 및 조건 검색 중…");
-                const pairId = await window.fb.requestMatchingWithFilters(getFilters());
-                setStatus("제안을 보냈습니다. 상대 응답을 기다리는 중…", "ok");
-                currentPairId = pairId;
+                if (go) {
+                    localStorage.setItem('lastRoomId', roomId);
+                    say('채팅방으로 이동합니다…');
+                    await fb.gotoRoom(roomId);
+                } else {
+                    say('상대가 채팅 시작을 거절했어요. (패널티 -1점)', false);
+                    await fb.applyPenalty({ kind: 'start_decline' });
+                }
             } catch (e) {
-                setStatus("시작 실패: " + (e.message || e), "err");
-                startBtn.disabled = startBotBtn.disabled = false; cancelBtn.disabled = true;
+                console.error(e);
+                say('시작 실패: ' + (e?.message || e), false);
+            } finally {
+                cleanup();
             }
-        });
+        }
 
-        startBotBtn.addEventListener("click", async () => {
+        async function onLeave() {
+            cancelRequested = true; // 즉시 취소 신호
+            finding = false;
+            setFindingUI(false);    // ✅ 필터/버튼 즉시 원복
             try {
-                botFrame.src = "about:blank"; botFrame.src = "bot.html?headless=1&autostart=1";
-                startBtn.disabled = startBotBtn.disabled = true; cancelBtn.disabled = false;
-                setStatus("봇 준비 완료. 대기열/제안 절차를 시작합니다…");
-                const pairId = await window.fb.requestMatchingWithFilters(getFilters());
-                setStatus("제안을 보냈습니다. 상대 응답을 기다리는 중…", "ok");
-                currentPairId = pairId;
+                const fb = await ensureFbReady();
+                await fb.cancelMatching();
+                say('대기열에서 나갔어요.');
             } catch (e) {
-                setStatus("봇 테스트 실패: " + (e.message || e), "err");
-                startBtn.disabled = startBotBtn.disabled = false; cancelBtn.disabled = true;
-                botFrame.src = "about:blank";
+                console.error(e);
+                say('나가기 실패: ' + (e?.message || e), false);
             }
-        });
+        }
 
-        cancelBtn.addEventListener("click", async () => {
-            try { await window.fb.cancelMatching(); setStatus("대기열에서 나갔습니다."); }
-            catch (e) { setStatus("취소 실패: " + (e.message || e), "err"); }
-            finally {
-                botFrame.src = "about:blank";
-                startBtn.disabled = startBotBtn.disabled = false; cancelBtn.disabled = true;
+        function cleanup(alsoCancel = false, fbInstance = null) {
+            if (!cancelRequested) say('');
+            finding = false;
+            setFindingUI(false); // ✅ 종료 시 필터 다시 활성화
+            if (alsoCancel) {
+                (async () => {
+                    try {
+                        const fb = fbInstance || await ensureFbReady();
+                        await fb.cancelMatching();
+                    } catch { }
+                })();
             }
-        });
-
-        acceptBtn.addEventListener("click", async () => {
-            try {
-                await window.fb.respondProposal(currentPairId, true);
-                incoming.style.display = "none";
-                readyYN.style.display = "block";
-                setStatus("수락 완료. 채팅 시작(Y/N)을 선택하세요.", "ok");
-            } catch (e) { setStatus("수락 실패: " + (e.message || e), "err"); }
-        });
-        declineBtn.addEventListener("click", async () => {
-            try {
-                await window.fb.respondProposal(currentPairId, false);
-                incoming.style.display = "none";
-                setStatus("거절했습니다. (패널티 정책이 적용될 수 있습니다)", "err");
-            } catch (e) { setStatus("거절 실패: " + (e.message || e), "err"); }
-        });
-
-        yesBtn.addEventListener("click", async () => {
-            try { await window.fb.readyForChat(currentPairId, true); setStatus("상대 확인을 기다리는 중…"); }
-            catch (e) { setStatus("처리 실패: " + (e.message || e), "err"); }
-        });
-        noBtn.addEventListener("click", async () => {
-            try { await window.fb.readyForChat(currentPairId, false); readyYN.style.display = "none"; setStatus("채팅 시작을 거절했습니다.", "err"); }
-            catch (e) { setStatus("처리 실패: " + (e.message || e), "err"); }
-        });
-
-        window.addEventListener("beforeunload", async () => {
-            try { await window.fb.cancelMatching(); } catch (_) { }
-            botFrame.src = "about:blank";
-        });
+        }
     </script>
 </body>
 </html>
