@@ -5,46 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>혼밥러 · 프로필</title>
     <link rel="stylesheet" href="style.css" />
-    <script type="module" src="./firebase.js?v=22"></script>
-
+    <script type="module" src="./firebase.js?v=27"></script>
 </head>
 <body>
-    <!-- ✅ 로그아웃은 이 버튼 하나만 존재해야 합니다 -->
-    <button id="logoutFab" class="btn outline">
-        로그아웃
-    </button>
+    <button id="logoutFab" class="btn outline">로그아웃</button>
 
     <div class="container">
-        <header class="page-header">
-            <h1 class="title">🍱 혼밥러 · 프로필</h1>
-        </header>
+        <header class="page-header"><h1 class="title">🍱 혼밥러 · 프로필</h1></header>
 
         <div class="card">
             <p class="muted">로그인 이메일: <span id="loginEmail"></span></p>
 
             <label class="label">학번(입학년도)</label>
             <input id="year" class="input" type="text" placeholder="예: 22" />
-
             <label class="label">나이(만)</label>
             <input id="age" class="input" type="text" placeholder="예: 만 나이 입력" />
-
             <label class="label">성별</label>
             <select id="gender" class="input">
                 <option value="">선택</option>
                 <option value="남">남</option>
                 <option value="여">여</option>
             </select>
-
             <label class="label">학과</label>
             <input id="major" class="input" type="text" placeholder="예: 소프트웨어학부" />
-
             <label class="label">MBTI</label>
             <input id="mbti" class="input" type="text" placeholder="예: ISTP" />
-
             <label class="label">혼밥 때 주요 소비 콘텐츠</label>
             <input id="content" class="input" type="text" placeholder="예: 유튜브, 음악" />
-
-            <!-- ✅ 공강시간(문장형 입력) -->
             <label class="label">공강시간(문장형 입력)</label>
             <input id="freeText" class="input" type="text" placeholder="예: 월 12-15, 화 3-4" />
 
@@ -52,18 +39,9 @@
             <p id="status" class="status muted" style="margin-top:8px;"></p>
         </div>
 
-        <!-- ✅ 위치만 조정: 겹치지 않도록 -0.7cm로 -->
         <div class="row between" style="margin-top:16px; transform: translateY(-0.7cm);">
-            <a class="btn outline"
-               href="community.html"
-               style="width:auto !important; display:inline-flex !important; padding:6px 12px; font-size:14px;">
-                커뮤니티
-            </a>
-            <a class="btn outline"
-               href="index.html"
-               style="width:auto !important; display:inline-flex !important; padding:6px 12px; font-size:14px;">
-                홈
-            </a>
+            <a class="btn outline" href="community.html" style="width:auto !important; display:inline-flex !important; padding:6px 12px; font-size:14px;">커뮤니티</a>
+            <a class="btn outline" href="index.html" style="width:auto !important; display:inline-flex !important; padding:6px 12px; font-size:14px;">홈</a>
         </div>
     </div>
 
@@ -71,30 +49,15 @@
         const fbReady = window.fbReady || Promise.resolve(window.fb);
         const $ = (id) => document.getElementById(id);
 
-        const year = $('year');
-        const age = $('age');
-        const gender = $('gender');
-        const major = $('major');
-        const mbti = $('mbti');
-        const content = $('content');
-        const freeText = $('freeText');
-        const loginEmail = $('loginEmail');
-        const statusEl = $('status');
-
-        function setStatus(msg, ok = true) {
-            statusEl.textContent = msg || '';
-            statusEl.className = 'status ' + (ok ? 'ok' : 'err');
-        }
+        const year = $('year'), age = $('age'), gender = $('gender'), major = $('major');
+        const mbti = $('mbti'), content = $('content'), freeText = $('freeText');
+        const loginEmail = $('loginEmail'), statusEl = $('status'), saveBtn = $('saveBtn');
+        const setStatus = (msg, kind = '') => { statusEl.textContent = msg || ''; statusEl.className = 'status ' + (kind || ''); };
 
         async function boot() {
             const fb = await fbReady;
-
-            try {
-                const u = await fb.requireAuth();
-                loginEmail.textContent = u?.email ?? '';
-            } catch {
-                loginEmail.textContent = '';
-            }
+            try { const u = await fb.requireAuth(); loginEmail.textContent = u?.email ?? '(익명)'; }
+            catch { loginEmail.textContent = ''; }
 
             try {
                 const data = await fb.loadProfile().catch(() => null);
@@ -107,27 +70,22 @@
                     if (data.content) content.value = data.content;
                     if (typeof data.freeText === 'string') freeText.value = data.freeText;
                 }
-            } catch (e) {
-                setStatus("프로필을 불러오지 못했어요.", false);
-            }
+            } catch { setStatus('프로필을 불러오지 못했어요.', 'err'); }
 
-            $('saveBtn').addEventListener('click', async () => {
-                setStatus('');
+            saveBtn.addEventListener('click', async () => {
+                setStatus('저장 중…'); saveBtn.disabled = true;
                 const payload = {
-                    year: year.value ? Number(year.value) : null,
-                    age: age.value ? Number(age.value) : null,
-                    gender: gender.value || null,
-                    major: major.value || null,
-                    mbti: mbti.value || null,
-                    content: content.value || null,
-                    freeText: freeText.value || ''
+                    year: year.value, age: age.value, gender: gender.value,
+                    major: major.value, mbti: mbti.value, content: content.value, freeText: freeText.value
                 };
                 try {
-                    await (await fbReady).saveProfile(payload);
-                    setStatus('프로필 저장 완료!', true);
+                    const res = await (await fbReady).saveProfile(payload);
+                    if (res?.ok) setStatus('프로필 저장 완료!', 'ok');
+                    else setStatus('저장 결과를 확인하지 못했어요.', 'err');
                 } catch (e) {
-                    setStatus('저장 실패: ' + (e.message || e), false);
-                }
+                    setStatus('저장 실패: ' + (e?.message || e), 'err');
+                    console.error('[profile save error]', e);
+                } finally { saveBtn.disabled = false; }
             });
 
             $('logoutFab').addEventListener('click', async () => {
@@ -135,7 +93,6 @@
                 location.href = 'login.html';
             });
         }
-
         boot();
     </script>
 </body>
