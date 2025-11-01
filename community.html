@@ -4,16 +4,61 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>혼밥러 · 커뮤니티</title>
-    <link rel="stylesheet" href="style.css?v=31" />
+    <link rel="stylesheet" href="style.css?v=17" />
+    <style>
+        .post-card {
+            background: #0e1322;
+            border: 1px solid #22283a;
+            border-radius: 12px;
+            padding: 14px;
+            margin-top: 12px
+        }
+
+        .post-title {
+            font-weight: 800;
+            font-size: 16px;
+            margin: 0 0 4px 0
+        }
+
+        .post-meta {
+            font-size: 12px;
+            color: #9aa0a6;
+            margin: 4px 0 8px 0
+        }
+
+        .post-body {
+            white-space: pre-wrap;
+            line-height: 1.5
+        }
+
+        .row-wrap {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .muted-sm {
+            color: #9aa0a6;
+            font-size: 12px
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 4px 8px;
+            border: 1px solid #2a3145;
+            border-radius: 999px;
+            font-size: 12px
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <div class="topbar">
             <div class="header" style="margin:0">
-                <div class="logo">🍚</div>
+                <div class="logo">🧑‍🍳</div>
                 <h1 class="title">혼밥러 · 커뮤니티</h1>
             </div>
-            <div>
+            <div class="row-wrap">
                 <a class="link-btn" href="match.html">매칭</a>
                 <a class="link-btn" href="profile.html">프로필</a>
                 <a class="link-btn" href="index.html">홈</a>
@@ -21,83 +66,141 @@
         </div>
 
         <div class="card">
-            <h3 style="margin:0 0 10px">게시글 쓰기</h3>
+            <h2 class="title" style="font-size:18px;margin-top:0">게시글 쓰기</h2>
             <label>제목</label>
-            <input id="title" type="text" placeholder="예: 오늘 점심 혼밥 후기" />
+            <input id="title" type="text" placeholder="예: 오늘 점심 혼밥 후기" maxlength="120" />
             <label>내용</label>
-            <textarea id="body" rows="4" placeholder="자유롭게 작성하세요."></textarea>
-            <button id="postBtn" class="btn" style="width:auto;min-width:90px">등록</button>
-            <p id="msg" class="status"></p>
+            <textarea id="body" rows="6" placeholder="예: 추천 식당/메뉴/시간대 등 자유롭게"></textarea>
+            <div class="row" style="margin-top:8px">
+                <button id="postBtn" class="btn" style="width:auto;min-width:120px">등록</button>
+                <span id="postMsg" class="status"></span>
+            </div>
         </div>
 
-        <div class="card">
-            <div class="topbar" style="margin:0 0 6px">
-                <h3 class="title" style="font-size:18px;margin:0">최신 글</h3>
+        <div class="card" style="margin-top:16px">
+            <div class="topbar" style="margin-bottom:0">
+                <h2 class="title" style="font-size:18px;margin:0">최신 글</h2>
+                <span class="muted-sm" id="countTxt"></span>
             </div>
             <div id="list"></div>
+            <button id="moreBtn" class="btn secondary" style="margin-top:12px;display:none">더 보기</button>
         </div>
     </div>
 
-    <script type="module" src="./firebase.js?v=31"></script>
+    <script type="module" src="./firebase.js?v=22"></script>
+
     <script type="module">
         const $ = (s) => document.querySelector(s);
-        const msg = $("#msg");
-        const setMsg = (t, ok = false) => { msg.className = "status " + (ok ? "ok" : "err"); msg.textContent = t; };
+        const list = $("#list");
+        const moreBtn = $("#moreBtn");
+        const countTxt = $("#countTxt");
+        const postBtn = $("#postBtn");
+        const postMsg = $("#postMsg");
+        let cursor = null;
 
         if (window.fbReady) await window.fbReady;
+        try { await window.fb.requireAuth(); } catch (e) {
+            alert("로그인이 필요합니다."); location.href = "login.html"; throw e;
+        }
 
-        // 글 등록
-        $("#postBtn").addEventListener("click", async () => {
+        postBtn.addEventListener("click", async () => {
             try {
-                msg.className = "status"; msg.textContent = "";
-                // ⬇ 반드시 .value로 문자열을 넘긴다
-                const title = String($("#title").value ?? "");
-                const body = String($("#body").value ?? "");
-                await window.fb.createPost(title, body);
-                setMsg("등록 완료!", true);
+                postMsg.className = "status"; postMsg.textContent = "";
+                const title = $("#title").value.trim();
+                const body = $("#body").value.trim();
+                if (!title) throw new Error("제목을 입력하세요.");
+                postBtn.disabled = true;
+                await window.fb.createPost({ title, body });
                 $("#title").value = ""; $("#body").value = "";
-                await render();
+                postMsg.className = "status ok"; postMsg.textContent = "등록 완료!";
+                list.innerHTML = ""; cursor = null; await loadMore();
             } catch (e) {
-                setMsg((e && e.message) ? e.message : String(e));
+                postMsg.className = "status err"; postMsg.textContent = e.message || e;
+            } finally {
+                postBtn.disabled = false;
             }
         });
 
-        // 목록
-        async function render() {
-            try {
-                const arr = await window.fb.listPosts({ limitCount: 50 });
-                const box = $("#list");
-                box.innerHTML = arr.map(p => {
-                    const when = p.createdAt?.toDate?.() ? p.createdAt.toDate().toLocaleString() : "";
-                    const title = (p.title || "").replace(/</g, "&lt;");
-                    const body = (p.body || "").replace(/</g, "&lt;");
-                    // 관리자면 규칙 통과로 삭제 가능(버튼은 모두 보이되, 권한 없으면 permission 에러)
-                    return `<div style="padding:10px;border:1px solid #22283a;border-radius:10px;margin:8px 0;background:#0e1322">
-                        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-                          <div style="font-weight:700">${title}</div>
-                          <button class="link-btn" data-del="${p.id}" style="background:#2a3145">삭제</button>
-                        </div>
-                        <div class="muted" style="font-size:12px">${when}</div>
-                        <div style="margin-top:6px">${body}</div>
-                      </div>`;
-                }).join("") || `<p class="muted">아직 글이 없어요.</p>`;
-
-                // 삭제 핸들러 위임
-                box.querySelectorAll("[data-del]").forEach(btn => {
-                    btn.addEventListener("click", async () => {
-                        try {
-                            await window.fb.deletePost(btn.dataset.del);
-                            await render();
-                        } catch (e) {
-                            alert((e && e.message) ? e.message : String(e));
-                        }
-                    });
-                });
-            } catch (e) {
-                console.error(e);
-            }
+        async function loadMore() {
+            const { items, cursor: next } = await window.fb.listPosts({ pageSize: 10, cursor });
+            items.forEach(renderPostCard);
+            cursor = next;
+            moreBtn.style.display = cursor ? "inline-block" : "none";
+            countTxt.textContent = "";
         }
-        render();
+        moreBtn.addEventListener("click", loadMore);
+
+        function esc(s) { return (s || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
+
+        function renderPostCard(p) {
+            const wrap = document.createElement("div");
+            wrap.className = "post-card";
+            wrap.innerHTML = `
+                    <h3 class="post-title">${esc(p.title)}</h3>
+                    <div class="post-meta">${p.authorEmail ? esc(p.authorEmail.split("@")[0]) : "익명"} · ${p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString() : ""}</div>
+                    <div class="post-body">${esc(p.body)}</div>
+                    <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+                      <button class="btn" data-action="like" style="width:auto;min-width:80px">좋아요 ♡ <span class="likecnt">0</span></button>
+                      ${p.authorUid === window.fb.auth.currentUser?.uid ? `
+                        <button class="btn secondary" data-action="edit"  style="width:auto">수정</button>
+                        <button class="btn secondary" data-action="del"   style="width:auto">삭제</button>
+                      ` : ""}
+                    </div>
+                    <div class="comments" style="margin-top:10px; padding-top:10px; border-top:1px solid #22283a">
+                      <div class="row">
+                        <input class="cinput" type="text" placeholder="댓글 입력..." />
+                        <button class="cbtn btn" style="width:auto;min-width:80px">전송</button>
+                      </div>
+                      <div class="clist"></div>
+                      <p class="cmsg status"></p>
+                    </div>
+                  `;
+            list.prepend(wrap);
+
+            const likeBtn = wrap.querySelector('[data-action="like"]');
+            const likeCntEl = wrap.querySelector('.likecnt');
+            const cInput = wrap.querySelector('.cinput');
+            const cBtn = wrap.querySelector('.cbtn');
+            const cList = wrap.querySelector('.clist');
+            const cMsg = wrap.querySelector('.cmsg');
+
+            const unLikes = window.fb.onLikeCount(p.id, (n) => { likeCntEl.textContent = String(n); });
+            likeBtn?.addEventListener("click", async () => {
+                likeBtn.disabled = true;
+                try { await window.fb.toggleLike(p.id); } finally { likeBtn.disabled = false; }
+            });
+
+            const unComments = window.fb.onComments(p.id, (arr) => {
+                cList.innerHTML = "";
+                arr.forEach(cm => {
+                    const item = document.createElement("div");
+                    item.className = "comment";
+                    item.innerHTML = `
+                        <div>${esc(cm.text)}</div>
+                        <div class="post-meta">${cm.authorEmail ? esc(cm.authorEmail.split("@")[0]) : "익명"} · ${cm.createdAt?.toDate ? cm.createdAt.toDate().toLocaleString() : ""}</div>
+                        ${cm.authorUid === window.fb.auth.currentUser?.uid ? `<a href="#" data-del="${cm.id}" class="muted-sm">삭제</a>` : ""}
+                      `;
+                    cList.appendChild(item);
+                });
+            });
+
+            cBtn.addEventListener("click", async () => {
+                try {
+                    cMsg.className = "status"; cMsg.textContent = "";
+                    const t = cInput.value.trim(); if (!t) return;
+                    cInput.value = ""; await window.fb.addComment(p.id, t);
+                } catch (e) { cMsg.className = "status err"; cMsg.textContent = e.message || e; }
+            });
+            cList.addEventListener("click", async (e) => {
+                const a = e.target.closest("a[data-del]"); if (!a) return;
+                e.preventDefault();
+                try { await window.fb.deleteComment(p.id, a.getAttribute("data-del")); } catch (_) { }
+            });
+
+            window.addEventListener("beforeunload", () => { try { unLikes(); } catch (_) { } try { unComments(); } catch (_) { } });
+        }
+
+        await loadMore();
     </script>
 </body>
 </html>
