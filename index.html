@@ -4,94 +4,210 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>혼밥러 · 홈</title>
-    <link rel="stylesheet" href="style.css?v=31" />
+    <link rel="stylesheet" href="style.css?v=20" />
+    <style>
+        /* 홈 전용 유틸 */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3,1fr);
+            gap: 12px;
+        }
+
+        .tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px;
+            border-radius: 14px;
+            background: #0e1322;
+            border: 1px solid #22283a;
+            cursor: pointer;
+            text-align: center;
+            min-height: 86px;
+        }
+
+            .tile .emoji {
+                font-size: 22px
+            }
+
+        .section-title {
+            font-size: 18px;
+            margin: 0 0 10px 0
+        }
+
+        .muted-sm {
+            color: #9aa0a6;
+            font-size: 12px
+        }
+
+        .post-card {
+            background: #0e1322;
+            border: 1px solid #22283a;
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 10px
+        }
+
+        .post-title {
+            font-weight: 800;
+            font-size: 15px;
+            margin: 0 0 4px 0
+        }
+
+        .post-meta {
+            color: #9aa0a6;
+            font-size: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .row-wrap {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <div class="logo">🍚</div>
+        <div class="header" style="margin-bottom:12px">
+            <div class="logo">🏫</div>
             <h1 class="title">혼밥러 · 홈</h1>
         </div>
 
+        <!-- 퀵 액션 -->
         <div class="card">
-            <div class="row" style="gap:16px">
-                <a class="link-btn" href="match.html" style="flex:1;text-align:center">
-                    <div>혼밥러 매칭</div><div class="muted">바로 시작</div>
+            <div class="grid-3">
+                <a class="tile" href="match.html">
+                    <div class="emoji">🍚</div>
+                    <div><b>혼밥러 매칭</b><div class="muted-sm">바로 시작</div></div>
                 </a>
-                <a class="link-btn" href="community.html" style="flex:1;text-align:center">
-                    <div>커뮤니티</div><div class="muted">글/댓글/좋아요</div>
+                <a class="tile" href="community.html">
+                    <div class="emoji">🗨️</div>
+                    <div><b>커뮤니티</b><div class="muted-sm">글/댓글/좋아요</div></div>
                 </a>
-                <a class="link-btn" href="profile.html" style="flex:1;text-align:center">
-                    <div>내 프로필</div><div class="muted">정보 수정</div>
+                <a class="tile" href="profile.html">
+                    <div class="emoji">👤</div>
+                    <div><b>내 프로필</b><div class="muted-sm">정보 수정</div></div>
                 </a>
             </div>
         </div>
 
-        <div class="card">
-            <h3 style="margin:0 0 10px">무슨 생각 중이에요?</h3>
-            <label>제목</label>
-            <input id="homeTitle" type="text" placeholder="예: 오늘 저녁 추천" />
-            <label>내용</label>
+        <!-- 홈에서 빠른 글쓰기 -->
+        <div class="card" style="margin-top:16px">
+            <h2 class="section-title">무슨 생각 중이에요?</h2>
             <div class="row">
-                <input id="homeText" type="text" placeholder="짧아도 좋아요! 간단 메모" />
-                <button id="homePostBtn" class="btn" style="width:auto;min-width:90px">등록</button>
+                <input id="quickTitle" type="text" placeholder="제목 (예: 오늘 점심 추천)" maxlength="120" />
             </div>
-            <p id="homeMsg" class="status"></p>
-            <p class="muted">전체 글쓰기는 커뮤니티에서 볼 수 있어요.</p>
+            <div class="row" style="margin-top:8px">
+                <input id="quickBody" type="text" placeholder="내용 한 줄 (커뮤니티에 올라가요)" />
+                <button id="quickPostBtn" class="btn" style="width:auto;min-width:120px">등록</button>
+            </div>
+            <p id="quickMsg" class="status"></p>
+            <div class="muted-sm">전체 글쓰기는 <a href="community.html">커뮤니티</a>에서 할 수 있어요.</div>
         </div>
 
-        <div class="card">
-            <div class="topbar" style="margin:0 0 6px">
-                <h3 class="title" style="font-size:18px;margin:0">최신 글</h3>
+        <!-- 최신 글 미리보기 -->
+        <div class="card" style="margin-top:16px">
+            <div class="topbar" style="margin-bottom:0">
+                <h2 class="section-title" style="margin:0">최신 글</h2>
                 <a class="link-btn" href="community.html">더 보기</a>
             </div>
-            <div id="recentPosts"></div>
+            <div id="feed"></div>
+        </div>
+
+        <!-- 내 프로필 요약 -->
+        <div class="card" style="margin-top:16px">
+            <h2 class="section-title">내 프로필</h2>
+            <div id="profileBox" class="muted-sm">불러오는 중...</div>
+            <div class="nav" style="margin-top:12px">
+                <a class="link-btn" href="profile.html">프로필 수정</a>
+            </div>
         </div>
     </div>
 
-    <script type="module" src="./firebase.js?v=31"></script>
+    <script type="module" src="./firebase.js?v=22"></script>
+
     <script type="module">
         const $ = (s) => document.querySelector(s);
-        const msg = $("#homeMsg");
-        const setMsg = (t, ok = false) => { msg.className = "status " + (ok ? "ok" : "err"); msg.textContent = t; };
+        const feed = $("#feed");
+        const quickTitle = $("#quickTitle");
+        const quickBody = $("#quickBody");
+        const quickBtn = $("#quickPostBtn");
+        const quickMsg = $("#quickMsg");
+        const profileBox = $("#profileBox");
 
         if (window.fbReady) await window.fbReady;
+        try { await window.fb.requireAuth(); } catch (e) { location.href = "signup.html"; throw e; }
 
-        // 최신 글 5개 표시
-        async function loadRecent() {
+        // 홈-빠른 글쓰기
+        quickBtn.addEventListener("click", async () => {
             try {
-                const arr = await window.fb.listPosts({ limitCount: 5 });
-                const box = $("#recentPosts");
-                box.innerHTML = arr.map(p => {
-                    const when = p.createdAt?.toDate?.() ? p.createdAt.toDate().toLocaleString() : "";
-                    const title = (p.title || "").replace(/</g, "&lt;");
-                    const body = (p.body || "").replace(/</g, "&lt;");
-                    return `<div style="padding:10px;border:1px solid #22283a;border-radius:10px;margin:8px 0;background:#0e1322">
-                        <div style="font-weight:700">${title}</div>
-                        <div class="muted" style="font-size:12px">${when}</div>
-                        <div style="margin-top:6px">${body}</div>
-                      </div>`;
-                }).join("") || `<p class="muted">아직 글이 없어요.</p>`;
+                quickMsg.className = "status"; quickMsg.textContent = "";
+                const title = (quickTitle.value || "").trim();
+                const body = (quickBody.value || "").trim();
+                if (!title) { quickMsg.className = "status err"; quickMsg.textContent = "제목을 입력하세요."; return; }
+                quickBtn.disabled = true;
+                await window.fb.createPost({ title, body });
+                quickTitle.value = ""; quickBody.value = "";
+                quickMsg.className = "status ok"; quickMsg.textContent = "등록 완료! 커뮤니티에 반영되었어요.";
+                feed.innerHTML = ""; await loadFeed();
             } catch (e) {
-                console.error(e);
+                quickMsg.className = "status err"; quickMsg.textContent = e.message || e;
+            } finally { quickBtn.disabled = false; }
+        });
+
+        // 최신 글 5개
+        function esc(s) { return (s || "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])); }
+        async function loadFeed() {
+            const { items } = await window.fb.listPosts({ pageSize: 5 });
+            items.forEach(p => {
+                const card = document.createElement("div");
+                card.className = "post-card";
+                card.innerHTML = `
+                      <div class="post-title">${esc(p.title)}</div>
+                      <div class="post-meta">
+                        <span>${p.authorEmail ? esc(p.authorEmail.split("@")[0]) : "익명"}</span>
+                        <span>·</span>
+                        <span>${p.createdAt?.toDate ? p.createdAt.toDate().toLocaleString() : ""}</span>
+                        <span>·</span>
+                        <span>좋아요 <b class="likecnt">0</b></span>
+                      </div>
+                      <div class="muted-sm" style="margin-top:6px">${esc((p.body || "").slice(0, 100))}${(p.body || "").length > 100 ? "…" : ""}</div>
+                      <div class="nav" style="margin-top:10px">
+                        <a class="link-btn" href="community.html">댓글/상세 보기</a>
+                      </div>
+                    `;
+                feed.appendChild(card);
+                const likeEl = card.querySelector(".likecnt");
+                const un = window.fb.onLikeCount(p.id, (n) => { likeEl.textContent = String(n); });
+                window.addEventListener("beforeunload", () => { try { un(); } catch (_) { } });
+            });
+            if (items.length === 0) {
+                const div = document.createElement("div"); div.className = "muted-sm"; div.style.marginTop = "6px";
+                div.textContent = "아직 글이 없어요. 첫 글을 남겨보세요!";
+                feed.appendChild(div);
             }
         }
-        loadRecent();
+        await loadFeed();
 
-        // 홈에서 간단 글 등록
-        $("#homePostBtn").addEventListener("click", async () => {
-            try {
-                msg.className = "status"; msg.textContent = "";
-                const title = String($("#homeTitle").value ?? "");  // ⬅ 문자열 보장
-                const text = String($("#homeText").value ?? "");
-                await window.fb.createPost(title, text);
-                setMsg("등록 완료!", true);
-                $("#homeTitle").value = ""; $("#homeText").value = "";
-                loadRecent();
-            } catch (e) {
-                setMsg((e && e.message) ? e.message : String(e));
-            }
-        });
+        // 내 프로필 요약
+        try {
+            const data = await window.fb.loadProfile().catch(() => null);
+            const lines = [];
+            if (data?.major) lines.push(`학과: ${data.major}`);
+            if (data?.year != null) lines.push(`학번: ${data.year}`);
+            if (data?.age != null) lines.push(`나이: ${data.age}`);
+            if (data?.gender) lines.push(`성별: ${data.gender}`);
+            if (data?.mbti) lines.push(`MBTI: ${data.mbti}`);
+            if (data?.content) lines.push(`혼밥 콘텐츠: ${data.content}`);
+            profileBox.textContent = lines.length ? lines.join(" · ") : "아직 프로필 정보가 비어 있어요.";
+        } catch {
+            profileBox.textContent = "프로필을 불러오지 못했어요.";
+        }
     </script>
 </body>
 </html>
