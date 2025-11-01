@@ -1,5 +1,10 @@
-// firebase.js v21 — 혼밥러 공용 헬퍼 (로그인/커뮤니티/매칭/노쇼/메시지)
+// firebase.js v22 — 혼밥러 공용 헬퍼 (로그인/커뮤니티/매칭/노쇼/메시지)
 // -----------------------------------------------------------------------------
+// 변경 요약
+// - 프레즌스 주기: 15초 → 60초, localhost에서는 프레즌스 비활성화(쿼터 절약)
+// - saveProfile: Firestore quota 초과(resource-exhausted) 메시지 명확화
+// -----------------------------------------------------------------------------
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
 import {
     getAuth, onAuthStateChanged,
@@ -66,7 +71,15 @@ const my = {
             honbapTemp: p.honbapTemp ?? 50,
             updatedAt: serverTimestamp(),
         };
-        await setDoc(doc(db, "profiles", my.uid), payload, { merge: true });
+        try {
+            await setDoc(doc(db, "profiles", my.uid), payload, { merge: true });
+        } catch (e) {
+            // 🔴 일일 한도(쿼터) 초과 시 사용자에게 즉시 알림
+            if (e?.code === 'resource-exhausted') {
+                throw new Error('Firestore 할당량을 초과했습니다. 잠시 후(일일 리셋 후) 다시 시도하거나 요금제를 업그레이드하세요.');
+            }
+            throw e;
+        }
     },
 };
 
@@ -94,25 +107,29 @@ async function createPost({ title, body }) {
         createdAt: serverTimestamp(),
     });
 }
-async function listPosts({ take = 30 } = {}) {
-    const qy = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(take));
+async function listPosts({ take = 30, pageSize = 30, cursor = null } = {}) {
+    // 기존 사용처 호환을 위해 인자 유지
+    const qy = query(collection(db, "posts"), orderBy("createdAt", "desc"), limit(pageSize || take));
     const ss = await getDocs(qy);
-    return ss.docs.map(d => ({ id: d.id, ...d.data() }));
+    return { items: ss.docs.map(d => ({ id: d.id, ...d.data() })), cursor: null };
 }
 
 // -----------------------------------------------------------------------------
 // 6) 프레즌스
+// ✅ 로컬 개발 환경에서는 프레즌스를 꺼서 쓰기 폭탄 방지
+const DEV_NO_PRESENCE = location.hostname === 'localhost';
+
 const presence = {
     tick: null,
     start() {
-        if (presence.tick) return;
+        if (DEV_NO_PRESENCE || presence.tick) return;
         presence.tick = setInterval(async () => {
             try {
                 await my.requireAuth();
                 await setDoc(doc(db, "presence", my.uid),
                     { lastActive: serverTimestamp() }, { merge: true });
             } catch { }
-        }, 15_000);
+        }, 60_000); // ⬅ 60초로 완화(기존 15초)
     },
     stop() { if (presence.tick) clearInterval(presence.tick); presence.tick = null; }
 };
@@ -353,7 +370,6 @@ async function leaveRoom(roomId) {
         if (members.length === 0) update.phase = 'ended';
         tx.update(ref, update);
     });
-    // 혹시 남아있을 수 있는 매칭 큐 문서도 정리
     await leaveQueueByUid(my.uid);
 }
 
