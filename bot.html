@@ -1,3 +1,4 @@
+bot.html
 <!-- === filename: bot.html (테스트봇 전용) === -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -6,8 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>혼밥러 · 테스트 봇</title>
     <link rel="stylesheet" href="style.css" />
-    <!-- 로더 -->
-    <script type="module" src="./firebase.js?v=23"></script>
+    <script type="module" src="./firebase.js?v=27"></script>
 </head>
 <body>
     <div class="container">
@@ -39,40 +39,30 @@
             el.style.color = ok ? 'var(--text-muted,#9fb7d0)' : '#ff6b6b';
         };
 
-        // 로더 준비 대기
         async function ensureFbReady(timeoutMs = 8000) {
             if (window.fb) return window.fb;
-            const readyP = (window.fbReady && typeof window.fbReady.then === 'function')
-                ? window.fbReady
-                : new Promise((resolve, reject) => {
-                    const t0 = Date.now();
-                    const iv = setInterval(() => {
-                        if (window.fb) { clearInterval(iv); resolve(window.fb); }
-                        if (Date.now() - t0 > timeoutMs) { clearInterval(iv); reject(new Error('firebase 로더가 준비되지 않았어요.')); }
-                    }, 100);
-                });
+            const readyP = window.fbReady ?? new Promise((resolve, reject) => {
+                const t0 = Date.now();
+                const iv = setInterval(() => {
+                    if (window.fb) { clearInterval(iv); resolve(window.fb); }
+                    if (Date.now() - t0 > timeoutMs) { clearInterval(iv); reject(new Error('firebase 로더가 준비되지 않았어요.')); }
+                }, 100);
+            });
             const timeoutP = new Promise((_, rej) => setTimeout(() => rej(new Error('firebase 로더가 준비되지 않았어요.')), timeoutMs));
             return await Promise.race([readyP, timeoutP]);
         }
 
         $('startBotBtn').addEventListener('click', async () => {
             const btn = $('startBotBtn');
-            btn.disabled = true;
-            say('');
+            btn.disabled = true; say('');
             try {
                 const fb = await ensureFbReady();
-                await fb.requireAuth(); // 익명 로그인 허용
-
-                // ✅ 테스트봇 즉시 매칭
+                await fb.requireAuth();
                 const { id: roomId } = await fb.startWithTestBot();
                 say('채팅방 생성 완료. 이동합니다…');
                 await fb.gotoRoom(roomId);
-            } catch (e) {
-                console.error(e);
-                say('시작 실패: ' + (e?.message || e), false);
-            } finally {
-                btn.disabled = false;
-            }
+            } catch (e) { console.error(e); say('시작 실패: ' + (e?.message || e), false); }
+            finally { btn.disabled = false; }
         });
     </script>
 </body>
