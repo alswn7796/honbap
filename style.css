@@ -237,3 +237,14 @@ input, select, textarea {
     gap: 8px;
     flex-wrap: wrap
 }
+/* --- profile 전용 로그아웃 FAB 고정/자동 폭 강제 --- */
+#logoutFab {
+    position: fixed;
+    right: 16px;
+    top: 14px;
+    z-index: 1000;
+    width: auto !important;
+    display: inline-flex !important;
+}
+
+0120
