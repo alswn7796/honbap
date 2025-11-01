@@ -1,3 +1,4 @@
+style.css
 :root {
     --bg: #0f1115;
     --panel: #151823;
@@ -9,7 +10,7 @@
     --danger: #ef4444;
     --ok: #22c55e;
     --radius: 16px;
-    --shadow: 0 10px 35px rgba(0,0,0,.35);
+    --shadow: 0 10px 35px rgba(0,0,0,.35)
 }
 
 * {
@@ -174,11 +175,11 @@ input, select, textarea {
         box-shadow: 0 0 0 3px rgba(125,211,252,.15);
     }
 
-/* 홈/대시보드에서 쓰는 유틸 (중복 방지로 여기도 넣음) */
+/* 홈/대시보드 공통 */
 .grid-3 {
     display: grid;
     grid-template-columns: repeat(3,1fr);
-    gap: 12px;
+    gap: 12px
 }
 
 .tile {
@@ -193,7 +194,7 @@ input, select, textarea {
     border: 1px solid #22283a;
     cursor: pointer;
     text-align: center;
-    min-height: 86px;
+    min-height: 86px
 }
 
     .tile .emoji {
@@ -237,7 +238,8 @@ input, select, textarea {
     gap: 8px;
     flex-wrap: wrap
 }
-/* --- profile 전용 로그아웃 FAB 고정/자동 폭 강제 --- */
+
+/* profile 전용 로그아웃 FAB */
 #logoutFab {
     position: fixed;
     right: 16px;
@@ -246,5 +248,3 @@ input, select, textarea {
     width: auto !important;
     display: inline-flex !important;
 }
-
-0120
